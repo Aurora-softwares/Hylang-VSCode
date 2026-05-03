@@ -13,8 +13,8 @@
     "vscode": "^1.85.0"
   },
   "scripts": {
-	"package": "vsce package --out dist/hydrogen-language-dev.vsix --allow-missing-repository",
-	"install:vsix": "npm run package && code --install-extension dist/hydrogen-language-dev.vsix --force"
+    "package": "vsce package --out dist/hydrogen-language-dev.vsix --allow-missing-repository",
+    "install:vsix": "npm run package && code --install-extension dist/hydrogen-language-dev.vsix --force"
   },
   "categories": [
     "Programming Languages",
@@ -135,7 +135,7 @@
     }
   },
   "devDependencies": {
-    "@types/vscode": "^1.118.0",
+    "@types/vscode": "^1.85.0",
     "@vscode/vsce": "^3.9.1",
     "typescript": "^6.0.3"
   }
