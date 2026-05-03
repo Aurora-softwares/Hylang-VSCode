@@ -1,0 +1,60 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "Hydrogen",
+  "scopeName": "source.hydrogen",
+  "patterns": [
+    { "include": "#comments" },
+    { "include": "#strings" },
+    { "include": "#numbers" },
+    { "include": "#keywords" },
+    { "include": "#types" },
+    { "include": "#members" },
+    { "include": "#operators" }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        { "name": "comment.line.double-slash.hydrogen", "match": "//.*$" },
+        { "name": "comment.block.hydrogen", "begin": "/\\*", "end": "\\*/" }
+      ]
+    },
+    "strings": {
+      "patterns": [
+        { "name": "string.quoted.double.hydrogen", "begin": "\"", "end": "\"", "patterns": [{ "name": "constant.character.escape.hydrogen", "match": "\\\\." }] }
+      ]
+    },
+    "numbers": {
+      "patterns": [
+        { "name": "constant.numeric.integer.hexadecimal.hydrogen", "match": "\\b0[xX][0-9a-fA-F_]+\\b" },
+        { "name": "constant.numeric.integer.binary.hydrogen", "match": "\\b0[bB][01_]+\\b" },
+        { "name": "constant.numeric.integer.decimal.hydrogen", "match": "\\b[0-9][0-9_]*\\b" }
+      ]
+    },
+    "keywords": {
+      "patterns": [
+        { "name": "keyword.control.hydrogen", "match": "\\b(if|else|while|for|break|continue|return)\\b" },
+        { "name": "keyword.declaration.hydrogen", "match": "\\b(using|namespace|class|struct|interface|enum|new|var)\\b" },
+        { "name": "storage.modifier.hydrogen", "match": "\\b(public|private|internal|protected|static|virtual|override|unsafe)\\b" },
+        { "name": "keyword.other.hydrogen", "match": "\\b(this|base|null|true|false|stackalloc|sizeof)\\b" }
+      ]
+    },
+    "types": {
+      "patterns": [
+        { "name": "storage.type.primitive.hydrogen", "match": "\\b(int|bool|string|void)\\b" },
+        { "name": "support.class.system.hydrogen", "match": "\\b(System|Console|File|Buffer|Memory|BinaryPrimitives|List|Convert|Testing|Assert)\\b" },
+        { "name": "entity.name.type.hydrogen", "match": "\\b[A-Z][A-Za-z0-9_]*\\b" }
+      ]
+    },
+    "members": {
+      "patterns": [
+        { "name": "entity.name.function.hydrogen", "match": "\\b[A-Za-z_][A-Za-z0-9_]*(?=\\s*\\()" },
+        { "name": "variable.other.member.hydrogen", "match": "(?<=\\.)[A-Za-z_][A-Za-z0-9_]*" }
+      ]
+    },
+    "operators": {
+      "patterns": [
+        { "name": "keyword.operator.hydrogen", "match": "==|!=|<=|>=|&&|\\|\\||[+\\-*/%<>=!:]" }
+      ]
+    }
+  }
+}

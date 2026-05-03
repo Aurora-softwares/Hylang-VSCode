@@ -1,0 +1,14 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "Hydrogen Project",
+  "scopeName": "source.hyproj",
+  "patterns": [
+    { "name": "comment.line.number-sign.hyproj", "match": "#.*$" },
+    { "name": "entity.name.section.hyproj", "match": "^\\s*\\[[^\\]]+\\]" },
+    { "name": "keyword.other.key.hyproj", "match": "^\\s*[A-Za-z_][A-Za-z0-9_-]*(?=\\s*=)" },
+    { "name": "string.quoted.double.hyproj", "begin": "\"", "end": "\"", "patterns": [{ "name": "constant.character.escape.hyproj", "match": "\\\\." }] },
+    { "name": "constant.numeric.hyproj", "match": "\\b[0-9]+\\b" },
+    { "name": "constant.language.boolean.hyproj", "match": "\\b(true|false)\\b" },
+    { "name": "keyword.operator.assignment.hyproj", "match": "=" }
+  ]
+}

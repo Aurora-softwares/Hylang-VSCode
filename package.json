@@ -1,0 +1,117 @@
+{
+  "name": "hydrogen-language-tools",
+  "displayName": "Hydrogen Language Tools",
+  "description": "Syntax highlighting, formatting, bracket diagnostics, and optional hy check diagnostics for Hydrogen / Hylang scripts.",
+  "version": "0.1.0",
+  "publisher": "aurora-softwares-local",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Formatters",
+    "Linters"
+  ],
+  "activationEvents": [
+    "onLanguage:hydrogen",
+    "onLanguage:hyproj",
+    "onCommand:hydrogen.checkCurrentFile",
+    "onCommand:hydrogen.formatCurrentFile"
+  ],
+  "main": "./extension.js",
+  "contributes": {
+    "languages": [
+      {
+        "id": "hydrogen",
+        "aliases": ["Hydrogen", "Hylang", "hy"],
+        "extensions": [".hy"],
+        "configuration": "./language-configuration.json"
+      },
+      {
+        "id": "hyproj",
+        "aliases": ["Hydrogen Project", "Hylang Project", "hyproj"],
+        "extensions": [".hyproj"],
+        "configuration": "./hyproj-language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "hydrogen",
+        "scopeName": "source.hydrogen",
+        "path": "./syntaxes/hydrogen.tmLanguage.json"
+      },
+      {
+        "language": "hyproj",
+        "scopeName": "source.hyproj",
+        "path": "./syntaxes/hyproj.tmLanguage.json"
+      }
+    ],
+    "snippets": [
+      {
+        "language": "hydrogen",
+        "path": "./snippets/hydrogen.json"
+      }
+    ],
+    "configuration": {
+      "title": "Hydrogen Language Tools",
+      "properties": {
+        "hydrogen.hyPath": {
+          "type": "string",
+          "default": "hy",
+          "description": "Path to the Hydrogen workflow CLI. Use an absolute path if hy is not on PATH."
+        },
+        "hydrogen.enableCompilerDiagnostics": {
+          "type": "boolean",
+          "default": true,
+          "description": "Run `hy check <target> --json` and show compiler diagnostics when available."
+        },
+        "hydrogen.enableStructuralDiagnostics": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show lightweight editor diagnostics for unclosed braces, brackets, parentheses, strings, and block comments."
+        },
+        "hydrogen.formatter.useHyFmt": {
+          "type": "boolean",
+          "default": true,
+          "description": "Use `hy fmt` for formatting when the Hydrogen CLI is available. Falls back to a simple brace-aware formatter."
+        },
+        "hydrogen.checkTarget": {
+          "type": "string",
+          "default": "",
+          "description": "Optional project/workspace target to pass to `hy check`. Leave blank to check the current file. Useful for multi-file .hyproj workspaces."
+        },
+        "hydrogen.diagnostics.debounceMs": {
+          "type": "number",
+          "default": 500,
+          "minimum": 100,
+          "description": "Delay before diagnostics update after typing."
+        }
+      }
+    },
+    "commands": [
+      {
+        "command": "hydrogen.checkCurrentFile",
+        "title": "Hydrogen: Check Current File"
+      },
+      {
+        "command": "hydrogen.formatCurrentFile",
+        "title": "Hydrogen: Format Current File"
+      }
+    ],
+    "menus": {
+      "editor/context": [
+        {
+          "command": "hydrogen.checkCurrentFile",
+          "when": "editorLangId == hydrogen || editorLangId == hyproj",
+          "group": "navigation"
+        },
+        {
+          "command": "hydrogen.formatCurrentFile",
+          "when": "editorLangId == hydrogen || editorLangId == hyproj",
+          "group": "navigation"
+        }
+      ]
+    }
+  }
+}
