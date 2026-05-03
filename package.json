@@ -3,10 +3,18 @@
   "displayName": "Hydrogen Language Tools",
   "description": "Syntax highlighting, formatting, bracket diagnostics, and optional hy check diagnostics for Hydrogen / Hylang scripts.",
   "version": "0.1.0",
-  "publisher": "aurora-softwares-local",
+  "publisher": "AuroraSoftwares",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Aurora-Softwares/Hylang-VSCode.git"
+  },
   "engines": {
     "vscode": "^1.85.0"
+  },
+  "scripts": {
+	"package": "vsce package --out dist/hydrogen-language-dev.vsix --allow-missing-repository",
+	"install:vsix": "npm run package && code --install-extension dist/hydrogen-language-dev.vsix --force"
   },
   "categories": [
     "Programming Languages",
@@ -24,14 +32,26 @@
     "languages": [
       {
         "id": "hydrogen",
-        "aliases": ["Hydrogen", "Hylang", "hy"],
-        "extensions": [".hy"],
+        "aliases": [
+          "Hydrogen",
+          "Hylang",
+          "hy"
+        ],
+        "extensions": [
+          ".hy"
+        ],
         "configuration": "./language-configuration.json"
       },
       {
         "id": "hyproj",
-        "aliases": ["Hydrogen Project", "Hylang Project", "hyproj"],
-        "extensions": [".hyproj"],
+        "aliases": [
+          "Hydrogen Project",
+          "Hylang Project",
+          "hyproj"
+        ],
+        "extensions": [
+          ".hyproj"
+        ],
         "configuration": "./hyproj-language-configuration.json"
       }
     ],
@@ -113,5 +133,10 @@
         }
       ]
     }
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.118.0",
+    "@vscode/vsce": "^3.9.1",
+    "typescript": "^6.0.3"
   }
 }
