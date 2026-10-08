@@ -1,5 +1,7 @@
 # Hydrogen Language Tools
 
+<img src="assets/hydrogen.icon.svg" style="display: block;margin-left: auto; margin-right: auto; width: 30%;" />
+
 Local VS Code support for Hydrogen / Hylang.
 
 ## Features
