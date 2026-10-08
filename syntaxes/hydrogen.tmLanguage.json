@@ -40,7 +40,7 @@
     },
     "types": {
       "patterns": [
-        { "name": "storage.type.primitive.hydrogen", "match": "\\b(int|bool|string|void)\\b" },
+        { "name": "storage.type.primitive.hydrogen", "match": "\\b(sbyte|byte|short|ushort|int|uint|long|ulong|nint|nuint|bool|string|void)\\b" },
         { "name": "support.class.system.hydrogen", "match": "\\b(System|Console|File|Buffer|Memory|BinaryPrimitives|List|Convert|Testing|Assert)\\b" },
         { "name": "entity.name.type.hydrogen", "match": "\\b[A-Z][A-Za-z0-9_]*\\b" }
       ]

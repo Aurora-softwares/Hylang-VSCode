@@ -1,321 +1,236 @@
 const vscode = require('vscode');
-const cp = require('child_process');
-const fs = require('fs');
-const os = require('os');
-const path = require('path');
+const childProcess = require('node:child_process');
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
+const { parseCheckOutput } = require('./diagnostics');
 
-const HYDROGEN_SELECTOR = [{ language: 'hydrogen', scheme: 'file' }, { language: 'hyproj', scheme: 'file' }];
-let diagnosticCollection;
-let timers = new Map();
+const selector = [{ language: 'hylang', scheme: 'file' }, { language: 'hyproj', scheme: 'file' }];
+const timers = new Map();
+const checkRevisions = new Map();
+const compilerSnapshots = new Map();
+let structuralDiagnostics;
+let compilerDiagnostics;
 let output;
+let formatWarningShown = false;
+
+function isHylangDocument(document) {
+  return document && (document.languageId === 'hylang' || document.languageId === 'hyproj');
+}
+
+function settings() {
+  return vscode.workspace.getConfiguration('hylang');
+}
 
 function activate(context) {
-  output = vscode.window.createOutputChannel('Hydrogen');
-  diagnosticCollection = vscode.languages.createDiagnosticCollection('hydrogen');
-  context.subscriptions.push(output, diagnosticCollection);
+  output = vscode.window.createOutputChannel('Hylang');
+  structuralDiagnostics = vscode.languages.createDiagnosticCollection('hylang-structure');
+  compilerDiagnostics = vscode.languages.createDiagnosticCollection('hylang-compiler');
+  context.subscriptions.push(output, structuralDiagnostics, compilerDiagnostics);
 
-  context.subscriptions.push(vscode.languages.registerDocumentFormattingEditProvider(HYDROGEN_SELECTOR, {
-    provideDocumentFormattingEdits(document) {
-      return formatDocument(document);
-    }
+  context.subscriptions.push(vscode.languages.registerDocumentFormattingEditProvider(selector, {
+    provideDocumentFormattingEdits: formatDocument
   }));
-
-  context.subscriptions.push(vscode.commands.registerCommand('hydrogen.checkCurrentFile', async () => {
-    const editor = vscode.window.activeTextEditor;
-    if (!editor || !isHydrogenDocument(editor.document)) return;
-    await updateDiagnostics(editor.document, true);
+  context.subscriptions.push(vscode.commands.registerCommand('hylang.checkCurrentFile', async () => {
+    const document = vscode.window.activeTextEditor?.document;
+    if (!isHylangDocument(document) || document.uri.scheme !== 'file') return;
+    if (document.isDirty && !await document.save()) return;
+    await checkDocument(document, true);
   }));
-
-  context.subscriptions.push(vscode.commands.registerCommand('hydrogen.formatCurrentFile', async () => {
+  context.subscriptions.push(vscode.commands.registerCommand('hylang.formatCurrentFile', async () => {
+    const document = vscode.window.activeTextEditor?.document;
+    if (!isHylangDocument(document)) return;
     await vscode.commands.executeCommand('editor.action.formatDocument');
   }));
-
-  context.subscriptions.push(vscode.workspace.onDidOpenTextDocument(scheduleDiagnostics));
-  context.subscriptions.push(vscode.workspace.onDidChangeTextDocument(e => scheduleDiagnostics(e.document)));
-  context.subscriptions.push(vscode.workspace.onDidSaveTextDocument(doc => updateDiagnostics(doc, false)));
-  context.subscriptions.push(vscode.workspace.onDidCloseTextDocument(doc => diagnosticCollection.delete(doc.uri)));
-
-  vscode.workspace.textDocuments.forEach(scheduleDiagnostics);
+  context.subscriptions.push(vscode.workspace.onDidOpenTextDocument(scheduleStructureCheck));
+  context.subscriptions.push(vscode.workspace.onDidChangeTextDocument(event => scheduleStructureCheck(event.document)));
+  context.subscriptions.push(vscode.workspace.onDidSaveTextDocument(document => {
+    scheduleStructureCheck(document);
+    void checkDocument(document, false);
+  }));
+  context.subscriptions.push(vscode.workspace.onDidCloseTextDocument(document => {
+    const key = document.uri.toString();
+    if (timers.has(key)) clearTimeout(timers.get(key));
+    timers.delete(key);
+    structuralDiagnostics.delete(document.uri);
+  }));
+  context.subscriptions.push(vscode.workspace.onDidChangeConfiguration(event => {
+    if (event.affectsConfiguration('hylang')) {
+      for (const document of vscode.workspace.textDocuments) scheduleStructureCheck(document);
+      if (!settings().get('enableCompilerDiagnostics', true)) {
+        compilerSnapshots.clear();
+        compilerDiagnostics.clear();
+      }
+    }
+  }));
+  for (const document of vscode.workspace.textDocuments) scheduleStructureCheck(document);
 }
 
 function deactivate() {
   for (const timer of timers.values()) clearTimeout(timer);
+  timers.clear();
 }
 
-function isHydrogenDocument(document) {
-  return document && (document.languageId === 'hydrogen' || document.languageId === 'hyproj');
-}
-
-function config() {
-  return vscode.workspace.getConfiguration('hydrogen');
-}
-
-function scheduleDiagnostics(document) {
-  if (!isHydrogenDocument(document)) return;
-  const delay = Math.max(100, config().get('diagnostics.debounceMs', 500));
+function scheduleStructureCheck(document) {
+  if (!isHylangDocument(document)) return;
   const key = document.uri.toString();
   if (timers.has(key)) clearTimeout(timers.get(key));
-  timers.set(key, setTimeout(() => updateDiagnostics(document, false), delay));
-}
-
-async function updateDiagnostics(document, userRequested) {
-  if (!isHydrogenDocument(document)) return;
-  const diagnostics = [];
-
-  if (config().get('enableStructuralDiagnostics', true)) {
-    diagnostics.push(...getStructuralDiagnostics(document));
-  }
-
-  if (config().get('enableCompilerDiagnostics', true) && document.uri.scheme === 'file') {
-    try {
-      diagnostics.push(...await getCompilerDiagnostics(document));
-    } catch (err) {
-      if (userRequested) {
-        vscode.window.showWarningMessage(`Hydrogen compiler diagnostics could not run: ${err.message}`);
-      }
-      output.appendLine(`[diagnostics] ${err.message}`);
+  const delay = Math.max(100, settings().get('diagnostics.debounceMs', 300));
+  timers.set(key, setTimeout(() => {
+    timers.delete(key);
+    if (settings().get('enableStructuralDiagnostics', true)) {
+      structuralDiagnostics.set(document.uri, findStructuralIssues(document));
+    } else {
+      structuralDiagnostics.delete(document.uri);
     }
-  }
-
-  diagnosticCollection.set(document.uri, diagnostics);
-  if (userRequested) vscode.window.showInformationMessage(`Hydrogen check complete: ${diagnostics.length} issue(s).`);
+  }, delay));
 }
 
-function getStructuralDiagnostics(document) {
-  const text = document.getText();
-  const diagnostics = [];
+function findStructuralIssues(document) {
+  const source = document.getText();
+  const issues = [];
   const stack = [];
-  let inString = false;
-  let inLineComment = false;
-  let inBlockComment = false;
-  let stringStart = null;
-  let blockCommentStart = null;
+  const pairs = { '{': '}', '[': ']', '(': ')' };
+  const openers = { '}': '{', ']': '[', ')': '(' };
+  const manifest = document.languageId === 'hyproj';
+  let state = 'code';
+  let start = 0;
   let escaped = false;
 
-  const pairs = { '{': '}', '[': ']', '(': ')' };
-  const closers = { '}': '{', ']': '[', ')': '(' };
+  const addIssue = (from, to, message) => {
+    const range = new vscode.Range(document.positionAt(from), document.positionAt(Math.max(from + 1, to)));
+    issues.push(new vscode.Diagnostic(range, message, vscode.DiagnosticSeverity.Error));
+  };
 
-  for (let i = 0; i < text.length; i++) {
-    const ch = text[i];
-    const next = text[i + 1];
-    const pos = document.positionAt(i);
-
-    if (inLineComment) {
-      if (ch === '\n') inLineComment = false;
-      continue;
-    }
-
-    if (inBlockComment) {
-      if (ch === '*' && next === '/') {
-        inBlockComment = false;
-        i++;
-      }
-      continue;
-    }
-
-    if (inString) {
+  for (let index = 0; index < source.length; index++) {
+    const char = source[index];
+    const next = source[index + 1];
+    if (state === 'line') { if (char === '\n') state = 'code'; continue; }
+    if (state === 'block') { if (char === '*' && next === '/') { state = 'code'; index++; } continue; }
+    if (state === 'string') {
       if (escaped) { escaped = false; continue; }
-      if (ch === '\\') { escaped = true; continue; }
-      if (ch === '"') { inString = false; stringStart = null; continue; }
-      if (ch === '\n') {
-        diagnostics.push(new vscode.Diagnostic(
-          rangeAt(document, stringStart.index, i),
-          'String is missing a closing quote before the end of the line.',
-          vscode.DiagnosticSeverity.Error
-        ));
-        inString = false;
-        stringStart = null;
-      }
+      if (char === '\\') { escaped = true; continue; }
+      if (char === '"') { state = 'code'; continue; }
+      if (char === '\n') { addIssue(start, index, 'String is missing a closing quote.'); state = 'code'; }
       continue;
     }
-
-    if (ch === '/' && next === '/') { inLineComment = true; i++; continue; }
-    if (ch === '/' && next === '*') { inBlockComment = true; blockCommentStart = { index: i, pos }; i++; continue; }
-    if (ch === '"') { inString = true; stringStart = { index: i, pos }; continue; }
-
-    if (pairs[ch]) {
-      stack.push({ ch, index: i, pos });
-    } else if (closers[ch]) {
-      const expectedOpen = closers[ch];
-      const last = stack.pop();
-      if (!last || last.ch !== expectedOpen) {
-        diagnostics.push(new vscode.Diagnostic(
-          new vscode.Range(pos, pos.translate(0, 1)),
-          `Unexpected closing '${ch}'.`,
-          vscode.DiagnosticSeverity.Error
-        ));
-        if (last) stack.push(last);
-      }
+    if ((manifest && char === '#') || (!manifest && char === '/' && next === '/')) {
+      state = 'line';
+      if (!manifest) index++;
+      continue;
+    }
+    if (!manifest && char === '/' && next === '*') { state = 'block'; start = index; index++; continue; }
+    if (char === '"') { state = 'string'; start = index; continue; }
+    if (pairs[char]) stack.push({ char, index });
+    else if (openers[char]) {
+      const last = stack[stack.length - 1];
+      if (last?.char === openers[char]) stack.pop();
+      else addIssue(index, index + 1, `Unexpected closing '${char}'.`);
     }
   }
-
-  if (inString && stringStart) {
-    diagnostics.push(new vscode.Diagnostic(
-      new vscode.Range(stringStart.pos, document.positionAt(text.length)),
-      'String is missing a closing quote.',
-      vscode.DiagnosticSeverity.Error
-    ));
-  }
-
-  if (inBlockComment && blockCommentStart) {
-    diagnostics.push(new vscode.Diagnostic(
-      new vscode.Range(blockCommentStart.pos, document.positionAt(text.length)),
-      'Block comment is missing closing */.',
-      vscode.DiagnosticSeverity.Error
-    ));
-  }
-
-  for (const item of stack) {
-    diagnostics.push(new vscode.Diagnostic(
-      new vscode.Range(item.pos, item.pos.translate(0, 1)),
-      `Missing closing '${pairs[item.ch]}' for '${item.ch}'.`,
-      vscode.DiagnosticSeverity.Error
-    ));
-  }
-
-  if (document.languageId === 'hydrogen') {
-    diagnostics.push(...getHydrogenStyleDiagnostics(document));
-  }
-
-  return diagnostics;
+  if (state === 'string') addIssue(start, source.length, 'String is missing a closing quote.');
+  if (state === 'block') addIssue(start, source.length, 'Block comment is missing closing */.');
+  for (const item of stack) addIssue(item.index, item.index + 1, `Missing closing '${pairs[item.char]}'.`);
+  return issues;
 }
 
-function getHydrogenStyleDiagnostics(document) {
-  const diagnostics = [];
-  const lines = document.getText().split(/\r?\n/);
-  let seenNamespace = false;
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    const clean = line.replace(/\/\/.*$/, '').trim();
-    if (/^namespace\b/.test(clean)) seenNamespace = true;
-    if (seenNamespace && /^using\b/.test(clean)) {
-      diagnostics.push(new vscode.Diagnostic(
-        new vscode.Range(new vscode.Position(i, line.indexOf('using')), new vscode.Position(i, line.length)),
-        '`using` directives should appear before the namespace declaration.',
-        vscode.DiagnosticSeverity.Warning
-      ));
-    }
-  }
-  return diagnostics;
+function workspaceDirectory(document) {
+  return vscode.workspace.getWorkspaceFolder(document.uri)?.uri.fsPath || path.dirname(document.uri.fsPath);
 }
 
-function rangeAt(document, start, end) {
-  return new vscode.Range(document.positionAt(start), document.positionAt(Math.max(start + 1, end)));
+function runHy(args, cwd) {
+  const command = settings().get('hyPath', 'hy').trim() || 'hy';
+  return new Promise((resolve, reject) => {
+    childProcess.execFile(command, args, { cwd, timeout: 15000, maxBuffer: 4 * 1024 * 1024 }, (error, stdout, stderr) => {
+      if (error?.code === 'ENOENT') reject(new Error(`Cannot find '${command}'. Set hylang.hyPath to the hy executable.`));
+      else if (error?.killed) reject(new Error('The Hylang command timed out after 15 seconds.'));
+      else resolve({ exitCode: error ? error.code || 1 : 0, stdout: stdout || '', stderr: stderr || '' });
+    });
+  });
 }
 
-async function getCompilerDiagnostics(document) {
-  const hyPath = config().get('hyPath', 'hy');
-  const configuredTarget = config().get('checkTarget', '').trim();
-  const target = configuredTarget || document.uri.fsPath;
-  const cwd = getWorkspaceFolder(document) || path.dirname(document.uri.fsPath);
-  const result = await execFile(hyPath, ['check', target, '--json'], { cwd, timeout: 15000 });
-
-  const raw = (result.stdout || '').trim();
-  if (!raw) return [];
-
-  let parsed;
+async function checkDocument(document, requested) {
+  if (!isHylangDocument(document) || document.uri.scheme !== 'file') return;
+  if (!requested && !settings().get('enableCompilerDiagnostics', true)) return;
+  const cwd = workspaceDirectory(document);
+  const configuredTarget = settings().get('checkTarget', '').trim();
+  const target = configuredTarget ? path.resolve(cwd, configuredTarget) : document.uri.fsPath;
+  const version = document.version;
+  const revision = (checkRevisions.get(target) || 0) + 1;
+  checkRevisions.set(target, revision);
   try {
-    parsed = JSON.parse(raw);
-  } catch {
-    throw new Error('`hy check --json` did not return valid JSON. See Hydrogen output for details.');
+    const result = await runHy(['check', target], cwd);
+    if (document.version !== version || checkRevisions.get(target) !== revision) return;
+    const raw = [result.stdout, result.stderr].filter(Boolean).join('\n');
+    const items = parseCheckOutput(raw, document.uri.fsPath);
+    const snapshot = [];
+    for (const item of items) {
+      const uri = vscode.Uri.file(path.resolve(cwd, item.file || document.uri.fsPath));
+      const range = new vscode.Range(
+        Math.max(0, item.line - 1), Math.max(0, item.column - 1),
+        Math.max(0, item.line - 1), Math.max(0, item.column)
+      );
+      const severity = item.severity === 'warning' ? vscode.DiagnosticSeverity.Warning : vscode.DiagnosticSeverity.Error;
+      const diagnostic = new vscode.Diagnostic(range, item.message, severity);
+      diagnostic.source = 'hy check';
+      snapshot.push({ uri, diagnostic });
+    }
+    compilerSnapshots.set(target, snapshot);
+    publishCompilerDiagnostics();
+    if (result.exitCode !== 0 && items.length === 0) {
+      const message = raw.trim() || `hy check exited with code ${result.exitCode}.`;
+      output.appendLine(`[check] ${message}`);
+      if (requested) vscode.window.showWarningMessage(`Hylang check failed. See the Hylang output channel: ${message.split('\n')[0]}`);
+    } else if (requested) {
+      vscode.window.showInformationMessage(`Hylang check complete: ${items.length} issue(s).`);
+    }
+  } catch (error) {
+    output.appendLine(`[check] ${error.message}`);
+    if (requested) vscode.window.showWarningMessage(error.message);
   }
-
-  const items = Array.isArray(parsed) ? parsed : (parsed.diagnostics || parsed.items || []);
-  return items
-    .filter(item => !item.file || path.resolve(cwd, item.file) === document.uri.fsPath || path.resolve(item.file) === document.uri.fsPath)
-    .map(item => diagnosticFromHyItem(document, item));
 }
 
-function diagnosticFromHyItem(document, item) {
-  const line = Math.max(0, Number(item.line || item.startLine || 1) - 1);
-  const col = Math.max(0, Number(item.column || item.startColumn || 1) - 1);
-  const endLine = Math.max(line, Number(item.endLine || item.line || line + 1) - 1);
-  const endCol = Math.max(col + 1, Number(item.endColumn || item.column || col + 2) - 1);
-  const severity = severityFromString(item.severity);
-  const diagnostic = new vscode.Diagnostic(
-    new vscode.Range(new vscode.Position(line, col), new vscode.Position(endLine, endCol)),
-    item.message || 'Hydrogen compiler diagnostic',
-    severity
-  );
-  diagnostic.source = 'hy check';
-  if (item.code) diagnostic.code = item.code;
-  return diagnostic;
+function publishCompilerDiagnostics() {
+  const grouped = new Map();
+  for (const snapshot of compilerSnapshots.values()) {
+    for (const { uri, diagnostic } of snapshot) {
+      const key = uri.toString();
+      if (!grouped.has(key)) grouped.set(key, { uri, diagnostics: [] });
+      grouped.get(key).diagnostics.push(diagnostic);
+    }
+  }
+  compilerDiagnostics.clear();
+  for (const group of grouped.values()) compilerDiagnostics.set(group.uri, group.diagnostics);
 }
 
-function severityFromString(value) {
-  const text = String(value || '').toLowerCase();
-  if (text.includes('error')) return vscode.DiagnosticSeverity.Error;
-  if (text.includes('warn')) return vscode.DiagnosticSeverity.Warning;
-  if (text.includes('info')) return vscode.DiagnosticSeverity.Information;
-  return vscode.DiagnosticSeverity.Warning;
+function warnFormat(message) {
+  output.appendLine(`[format] ${message}`);
+  if (!formatWarningShown) {
+    formatWarningShown = true;
+    vscode.window.showWarningMessage(message);
+  }
 }
 
 async function formatDocument(document) {
-  const fullRange = new vscode.Range(document.positionAt(0), document.positionAt(document.getText().length));
-  if (config().get('formatter.useHyFmt', true) && document.uri.scheme === 'file') {
-    try {
-      const formatted = await formatWithHyFmt(document);
-      if (formatted && formatted !== document.getText()) return [vscode.TextEdit.replace(fullRange, formatted)];
-    } catch (err) {
-      output.appendLine(`[format] ${err.message}`);
-    }
-  }
-  const fallback = fallbackFormat(document.getText());
-  return fallback === document.getText() ? [] : [vscode.TextEdit.replace(fullRange, fallback)];
-}
-
-async function formatWithHyFmt(document) {
-  const hyPath = config().get('hyPath', 'hy');
-  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'hydrogen-vscode-'));
-  const tmpFile = path.join(tmpDir, path.basename(document.uri.fsPath || `scratch.${document.languageId === 'hyproj' ? 'hyproj' : 'hy'}`));
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'hylang-vscode-'));
+  const filename = path.join(directory, `document.${document.languageId === 'hyproj' ? 'hyproj' : 'hy'}`);
   try {
-    fs.writeFileSync(tmpFile, document.getText(), 'utf8');
-    await execFile(hyPath, ['fmt', tmpFile], { cwd: getWorkspaceFolder(document) || tmpDir, timeout: 15000 });
-    return fs.readFileSync(tmpFile, 'utf8');
+    fs.writeFileSync(filename, document.getText(), 'utf8');
+    const result = await runHy(['fmt', filename], workspaceDirectory(document));
+    if (result.exitCode !== 0) {
+      const detail = [result.stderr, result.stdout].find(text => text.trim())?.trim() || 'hy fmt failed.';
+      warnFormat(`Formatting requires a Hylang CLI with hy fmt support. ${detail}`);
+      return [];
+    }
+    const formatted = fs.readFileSync(filename, 'utf8');
+    if (formatted === document.getText()) return [];
+    return [vscode.TextEdit.replace(new vscode.Range(document.positionAt(0), document.positionAt(document.getText().length)), formatted)];
+  } catch (error) {
+    warnFormat(error.message);
+    return [];
   } finally {
-    try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch {}
+    fs.rmSync(directory, { recursive: true, force: true });
   }
-}
-
-function fallbackFormat(text) {
-  const lines = text.split(/\r?\n/);
-  let indent = 0;
-  const out = [];
-  for (const raw of lines) {
-    const trimmed = raw.trim();
-    if (!trimmed) { out.push(''); continue; }
-    if (/^[}\])]/.test(trimmed)) indent = Math.max(0, indent - 1);
-    out.push('    '.repeat(indent) + trimmed);
-    const openCount = countSyntax(trimmed, /[\{\[\(]/g);
-    const closeCount = countSyntax(trimmed, /[\}\]\)]/g);
-    indent = Math.max(0, indent + openCount - closeCount);
-  }
-  return out.join('\n');
-}
-
-function countSyntax(line, regex) {
-  const stripped = line.replace(/"(?:\\.|[^"\\])*"/g, '').replace(/\/\/.*$/, '');
-  const matches = stripped.match(regex);
-  return matches ? matches.length : 0;
-}
-
-function getWorkspaceFolder(document) {
-  const folder = vscode.workspace.getWorkspaceFolder(document.uri);
-  return folder ? folder.uri.fsPath : undefined;
-}
-
-function execFile(command, args, options) {
-  return new Promise((resolve, reject) => {
-    cp.execFile(command, args, { ...options, maxBuffer: 1024 * 1024 }, (error, stdout, stderr) => {
-      if (stderr) output.appendLine(stderr.trim());
-      if (error) {
-        if (error.code === 'ENOENT') reject(new Error(`Could not find Hydrogen CLI at '${command}'. Set hydrogen.hyPath in VS Code settings.`));
-        else reject(new Error(stderr?.trim() || error.message));
-        return;
-      }
-      resolve({ stdout, stderr });
-    });
-  });
 }
 
 module.exports = { activate, deactivate };

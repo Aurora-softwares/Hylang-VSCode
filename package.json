@@ -1,8 +1,9 @@
 {
   "name": "hydrogen-language-tools",
-  "displayName": "Hydrogen Language Tools",
-  "description": "Syntax highlighting, formatting, bracket diagnostics, and optional hy check diagnostics for Hydrogen / Hylang scripts.",
-  "version": "0.1.0",
+  "displayName": "Hylang Language Tools",
+  "description": "VS Code support for Hydrogen source and project files.",
+  "version": "0.2.1",
+  "icon": "assets/hylang-icon.png",
   "publisher": "AuroraSoftwares",
   "license": "MIT",
   "repository": {
@@ -12,29 +13,31 @@
   "engines": {
     "vscode": "^1.85.0"
   },
-  "scripts": {
-    "package": "vsce package --out dist/hydrogen-language-dev.vsix --allow-missing-repository",
-    "install:vsix": "npm run package && code --install-extension dist/hydrogen-language-dev.vsix --force"
-  },
+  "main": "./extension.js",
+  "activationEvents": [
+    "onLanguage:hylang",
+    "onLanguage:hyproj",
+    "onCommand:hylang.checkCurrentFile",
+    "onCommand:hylang.formatCurrentFile"
+  ],
   "categories": [
     "Programming Languages",
     "Formatters",
     "Linters"
   ],
-  "activationEvents": [
-    "onLanguage:hydrogen",
-    "onLanguage:hyproj",
-    "onCommand:hydrogen.checkCurrentFile",
-    "onCommand:hydrogen.formatCurrentFile"
-  ],
-  "main": "./extension.js",
+  "scripts": {
+    "test": "node --test",
+    "package": "node -e \"require('node:fs').mkdirSync('dist',{recursive:true})\" && vsce package --out dist/hydrogen-language-tools.vsix",
+    "publish": "gh workflow run publish.yml",
+    "install": "npm run package && code --install-extension dist/hydrogen-language-tools.vsix --force"
+  },
   "contributes": {
     "languages": [
       {
-        "id": "hydrogen",
+        "id": "hylang",
         "aliases": [
-          "Hydrogen",
           "Hylang",
+          "Hydrogen",
           "hy"
         ],
         "extensions": [
@@ -45,8 +48,8 @@
       {
         "id": "hyproj",
         "aliases": [
-          "Hydrogen Project",
           "Hylang Project",
+          "Hydrogen Project",
           "hyproj"
         ],
         "extensions": [
@@ -57,7 +60,7 @@
     ],
     "grammars": [
       {
-        "language": "hydrogen",
+        "language": "hylang",
         "scopeName": "source.hydrogen",
         "path": "./syntaxes/hydrogen.tmLanguage.json"
       },
@@ -69,66 +72,61 @@
     ],
     "snippets": [
       {
-        "language": "hydrogen",
+        "language": "hylang",
         "path": "./snippets/hydrogen.json"
       }
     ],
     "configuration": {
-      "title": "Hydrogen Language Tools",
+      "title": "Hylang Language Tools",
       "properties": {
-        "hydrogen.hyPath": {
+        "hylang.hyPath": {
           "type": "string",
           "default": "hy",
-          "description": "Path to the Hydrogen workflow CLI. Use an absolute path if hy is not on PATH."
+          "description": "Path to the Hylang hy executable. Use an absolute path if it is not on PATH."
         },
-        "hydrogen.enableCompilerDiagnostics": {
+        "hylang.enableCompilerDiagnostics": {
           "type": "boolean",
           "default": true,
-          "description": "Run `hy check <target> --json` and show compiler diagnostics when available."
+          "description": "Run hy check after saving a .hy or .hyproj file."
         },
-        "hydrogen.enableStructuralDiagnostics": {
+        "hylang.enableStructuralDiagnostics": {
           "type": "boolean",
           "default": true,
-          "description": "Show lightweight editor diagnostics for unclosed braces, brackets, parentheses, strings, and block comments."
+          "description": "Check unmatched brackets, strings, and comments while editing."
         },
-        "hydrogen.formatter.useHyFmt": {
-          "type": "boolean",
-          "default": true,
-          "description": "Use `hy fmt` for formatting when the Hydrogen CLI is available. Falls back to a simple brace-aware formatter."
-        },
-        "hydrogen.checkTarget": {
+        "hylang.checkTarget": {
           "type": "string",
           "default": "",
-          "description": "Optional project/workspace target to pass to `hy check`. Leave blank to check the current file. Useful for multi-file .hyproj workspaces."
+          "description": "Optional file or .hyproj target for hy check, relative to the workspace. Leave blank to check the current file."
         },
-        "hydrogen.diagnostics.debounceMs": {
+        "hylang.diagnostics.debounceMs": {
           "type": "number",
-          "default": 500,
+          "default": 300,
           "minimum": 100,
-          "description": "Delay before diagnostics update after typing."
+          "description": "Delay in milliseconds before updating structural diagnostics after typing."
         }
       }
     },
     "commands": [
       {
-        "command": "hydrogen.checkCurrentFile",
-        "title": "Hydrogen: Check Current File"
+        "command": "hylang.checkCurrentFile",
+        "title": "Hylang: Check Current File"
       },
       {
-        "command": "hydrogen.formatCurrentFile",
-        "title": "Hydrogen: Format Current File"
+        "command": "hylang.formatCurrentFile",
+        "title": "Hylang: Format Current File"
       }
     ],
     "menus": {
       "editor/context": [
         {
-          "command": "hydrogen.checkCurrentFile",
-          "when": "editorLangId == hydrogen || editorLangId == hyproj",
+          "command": "hylang.checkCurrentFile",
+          "when": "editorLangId == hylang || editorLangId == hyproj",
           "group": "navigation"
         },
         {
-          "command": "hydrogen.formatCurrentFile",
-          "when": "editorLangId == hydrogen || editorLangId == hyproj",
+          "command": "hylang.formatCurrentFile",
+          "when": "editorLangId == hylang || editorLangId == hyproj",
           "group": "navigation"
         }
       ]
@@ -136,7 +134,7 @@
   },
   "devDependencies": {
     "@types/vscode": "^1.85.0",
-    "@vscode/vsce": "^3.9.1",
+    "@vscode/vsce": "^4.0.0",
     "typescript": "^6.0.3"
   }
 }

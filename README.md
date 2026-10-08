@@ -1,55 +1,77 @@
-# Hydrogen Language Tools
+# Hydrogen Language Tools for VS Code
 
-<img src="assets/hydrogen.icon.svg" style="display: block;margin-left: auto; margin-right: auto; width: 30%;" />
+![Hydrogen extension icon](assets/hylang-icon.png)
 
-Local VS Code support for Hydrogen / Hylang.
+Editor support for Hylang (also called Hydrogen). The extension recognizes `.hy` source files and `.hyproj` project manifests.
 
 ## Features
 
-- Syntax highlighting for `.hy` files.
-- Basic highlighting for `.hyproj` project manifests.
+- Syntax highlighting, comments, bracket matching, and indentation for `.hy` and `.hyproj` files.
 - Snippets for namespaces, classes, `Main`, loops, and console output.
-- Document formatting:
-  - Uses `hy fmt` when available.
-  - Falls back to a simple brace-aware formatter when `hy` is missing.
-- Diagnostics:
-  - Built-in checks for missing closing `{}`, `[]`, `()`, quotes, and block comments.
-  - Warning when `using` appears after a namespace declaration.
-  - Optional `hy check <target> --json` diagnostics.
+- Immediate structural diagnostics for unmatched brackets, unterminated strings, and block comments.
+- Compiler diagnostics from `hy check` when the `hy` executable is available. The extension checks the saved file, or a configured `.hyproj` target, and shows issues in VS Code's Problems view.
+- Document formatting through `hy fmt` when using a CLI build that provides it. The released Hydrogen compiler does not currently provide `hy fmt`.
 
-## Install
+The compiler is **not bundled** in the extension. Highlighting, snippets, and structural diagnostics work without it. The extension does not currently provide completion, go to definition, or a language server client.
 
-From the folder containing the VSIX:
+## Build and export a VSIX
+
+Install [Node.js and npm](https://nodejs.org/), then run these commands from this folder (`Hylang-VSCode`):
 
 ```bash
-code --install-extension hydrogen-language-tools-0.1.0.vsix
+npm ci
+npm test
+npm run package
 ```
 
-Or in VS Code:
+`npm run package` creates `dist/hydrogen-language-tools.vsix`. This VSIX is the exported plugin file to share or install; it does not publish the extension to the Marketplace. The package script uses the local `@vscode/vsce` dependency, so a global `vsce` installation is unnecessary.
 
-1. Open Extensions.
-2. Choose the `...` menu.
-3. Select **Install from VSIX...**.
-4. Pick `hydrogen-language-tools-0.1.0.vsix`.
+## Change the extension icon
 
-## Recommended settings
+The extension listing uses `assets/hylang-icon.png`, specified by the `icon` property in `package.json`. To use your own artwork, replace that PNG with a square image of at least 128 × 128 pixels (256 × 256 is recommended), then run `npm run package` again. Install the rebuilt VSIX with `code --install-extension dist/hydrogen-language-tools.vsix --force`. The SVG in `assets/hydrogen.icon.svg` is the editable source for the included icon; VS Code's extension icon must be a PNG.
 
-If `hy` is not on your PATH, set the CLI path:
+To try the extension without creating a VSIX, open this folder in VS Code and press **F5** to launch an Extension Development Host, or run:
+
+```bash
+code --extensionDevelopmentPath="$PWD" /path/to/your/hydrogen/project
+```
+
+## Install the exported plugin
+
+In VS Code, open **Extensions**, select the **...** menu, choose **Install from VSIX...**, and select `dist/hydrogen-language-tools.vsix`. Reload the VS Code window if prompted.
+
+Or install it from a terminal:
+
+```bash
+code --install-extension dist/hydrogen-language-tools.vsix
+```
+
+To replace an already installed copy with a newly built VSIX, run:
+
+```bash
+code --install-extension dist/hydrogen-language-tools.vsix --force
+```
+
+You can also build and install in one step with `npm run install:vsix`. Once installed, open a `.hy` or `.hyproj` file and confirm that VS Code shows **Hylang** or **Hylang Project** as the language mode. VS Code's [VSIX installation guide](https://code.visualstudio.com/docs/configure/extensions/extension-marketplace#_install-from-a-vsix) covers the same UI and CLI installation methods.
+
+## Connect the compiler
+
+Install a Hylang/Hydrogen `hy` compiler separately and make it available on `PATH`, or set its absolute path in VS Code settings:
 
 ```json
 {
-  "hydrogen.hyPath": "/absolute/path/to/hy"
+  "hylang.hyPath": "/absolute/path/to/hy"
 }
 ```
 
-For multi-file projects, set the project or workspace target so diagnostics check the whole project:
+The extension runs `hy check` on save. Use **Hylang: Check Current File** from the Command Palette to run it manually. Compiler errors appear in **View > Problems**. For projects with multiple source files, set a project target so the compiler checks the complete project:
 
 ```json
 {
-  "hydrogen.checkTarget": "path/to/YourProject.hyproj"
+  "hylang.checkTarget": "MyApp/MyApp.hyproj"
 }
 ```
 
-## Notes
+The target path is relative to the open workspace folder. You can turn automatic compiler checks off with `"hylang.enableCompilerDiagnostics": false`; the manual check command remains available. If `hy` is missing or fails without recognizable diagnostics, open **View > Output** and select **Hylang** for details.
 
-This extension is intentionally local-first. It does not bundle the Hydrogen compiler. It will still provide syntax highlighting, snippets, fallback formatting, and structural diagnostics without `hy` installed.
+**Formatting:** **Hylang: Format Current File** and VS Code's **Format Document** command use `hy fmt` on a temporary copy of the file, then apply the result in the editor. This requires a CLI build with `hy fmt`, such as the C++ SDK. The released self-hosted compiler supports `hy check` but not `hy fmt`; on that compiler, formatting reports that it is unavailable and leaves the document unchanged.
