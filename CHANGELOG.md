@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.0
+
+- Added file icons
+
 ## 0.2.1
 
 - Added a PNG extension icon derived from the existing Hydrogen SVG.
