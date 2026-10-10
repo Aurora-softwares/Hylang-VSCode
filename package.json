@@ -1,140 +1,130 @@
 {
-  "name": "hydrogen-language-tools",
-  "displayName": "Hylang Language Tools",
-  "description": "VS Code support for Hydrogen source and project files.",
-  "version": "0.2.1",
-  "icon": "assets/hylang-icon.png",
-  "publisher": "AuroraSoftwares",
-  "license": "MIT",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/Aurora-Softwares/Hylang-VSCode.git"
-  },
-  "engines": {
-    "vscode": "^1.85.0"
-  },
-  "main": "./extension.js",
-  "activationEvents": [
-    "onLanguage:hylang",
-    "onLanguage:hyproj",
-    "onCommand:hylang.checkCurrentFile",
-    "onCommand:hylang.formatCurrentFile"
-  ],
-  "categories": [
-    "Programming Languages",
-    "Formatters",
-    "Linters"
-  ],
-  "scripts": {
-    "test": "node --test",
-    "package": "node -e \"require('node:fs').mkdirSync('dist',{recursive:true})\" && vsce package --out dist/hydrogen-language-tools.vsix",
-    "publish": "gh workflow run publish.yml",
-    "install": "npm run package && code --install-extension dist/hydrogen-language-tools.vsix --force"
-  },
-  "contributes": {
-    "languages": [
-      {
-        "id": "hylang",
-        "aliases": [
-          "Hylang",
-          "Hydrogen",
-          "hy"
-        ],
-        "extensions": [
-          ".hy"
-        ],
-        "configuration": "./language-configuration.json"
-      },
-      {
-        "id": "hyproj",
-        "aliases": [
-          "Hylang Project",
-          "Hydrogen Project",
-          "hyproj"
-        ],
-        "extensions": [
-          ".hyproj"
-        ],
-        "configuration": "./hyproj-language-configuration.json"
-      }
-    ],
-    "grammars": [
-      {
-        "language": "hylang",
-        "scopeName": "source.hydrogen",
-        "path": "./syntaxes/hydrogen.tmLanguage.json"
-      },
-      {
-        "language": "hyproj",
-        "scopeName": "source.hyproj",
-        "path": "./syntaxes/hyproj.tmLanguage.json"
-      }
-    ],
-    "snippets": [
-      {
-        "language": "hylang",
-        "path": "./snippets/hydrogen.json"
-      }
-    ],
-    "configuration": {
-      "title": "Hylang Language Tools",
-      "properties": {
-        "hylang.hyPath": {
-          "type": "string",
-          "default": "hy",
-          "description": "Path to the Hylang hy executable. Use an absolute path if it is not on PATH."
-        },
-        "hylang.enableCompilerDiagnostics": {
-          "type": "boolean",
-          "default": true,
-          "description": "Run hy check after saving a .hy or .hyproj file."
-        },
-        "hylang.enableStructuralDiagnostics": {
-          "type": "boolean",
-          "default": true,
-          "description": "Check unmatched brackets, strings, and comments while editing."
-        },
-        "hylang.checkTarget": {
-          "type": "string",
-          "default": "",
-          "description": "Optional file or .hyproj target for hy check, relative to the workspace. Leave blank to check the current file."
-        },
-        "hylang.diagnostics.debounceMs": {
-          "type": "number",
-          "default": 300,
-          "minimum": 100,
-          "description": "Delay in milliseconds before updating structural diagnostics after typing."
-        }
-      }
-    },
-    "commands": [
-      {
-        "command": "hylang.checkCurrentFile",
-        "title": "Hylang: Check Current File"
-      },
-      {
-        "command": "hylang.formatCurrentFile",
-        "title": "Hylang: Format Current File"
-      }
-    ],
-    "menus": {
-      "editor/context": [
-        {
-          "command": "hylang.checkCurrentFile",
-          "when": "editorLangId == hylang || editorLangId == hyproj",
-          "group": "navigation"
-        },
-        {
-          "command": "hylang.formatCurrentFile",
-          "when": "editorLangId == hylang || editorLangId == hyproj",
-          "group": "navigation"
-        }
-      ]
-    }
-  },
-  "devDependencies": {
-    "@types/vscode": "^1.85.0",
-    "@vscode/vsce": "^4.0.0",
-    "typescript": "^6.0.3"
-  }
+	"name": "hydrogen-language-tools",
+	"displayName": "Hylang Language Tools",
+	"description": "VS Code support for Hydrogen source and project files.",
+	"version": "0.3.0",
+	"icon": "assets/hylang-icon.png",
+	"publisher": "AuroraSoftwares",
+	"license": "MIT",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/Aurora-Softwares/Hylang-VSCode.git"
+	},
+	"engines": {
+		"vscode": "^1.85.0"
+	},
+	"main": "./extension.js",
+	"activationEvents": [
+		"onLanguage:hylang",
+		"onLanguage:hyproj",
+		"onCommand:hylang.checkCurrentFile",
+		"onCommand:hylang.formatCurrentFile"
+	],
+	"categories": [
+		"Programming Languages",
+		"Formatters",
+		"Linters"
+	],
+	"scripts": {
+		"test": "node --test",
+		"package": "node -e \"require('node:fs').mkdirSync('dist',{recursive:true})\" && vsce package --out dist/hydrogen-language-tools.vsix",
+		"publish": "gh workflow run publish.yml",
+		"install": "npm run package && code --install-extension dist/hydrogen-language-tools.vsix --force"
+	},
+	"contributes": {
+		"languages": [
+			{ "id": "hylang",
+				"aliases": ["Hylang", "Hydrogen", "hy"],
+				"extensions": [".hy"],
+				"configuration": "./language-configuration.json",
+				"icon": {
+					"light": "./assets/icons/hydrogen.svg",
+					"dark": "./assets/icons/hydrogen.svg"
+				}
+			},{"id": "hyproj",
+				"aliases": ["Hylang Project", "Hydrogen Project", "hyproj"],
+				"extensions": [".hyproj"],
+				"configuration": "./hyproj-language-configuration.json",
+				"icon": {
+					"light": "./assets/icons/hydrogen.project.svg",
+					"dark": "./assets/icons/hydrogen.project.svg"
+				}
+			}
+		],
+		"grammars": [
+			{
+				"language": "hylang",
+				"scopeName": "source.hydrogen",
+				"path": "./syntaxes/hydrogen.tmLanguage.json"
+			},
+			{
+				"language": "hyproj",
+				"scopeName": "source.hyproj",
+				"path": "./syntaxes/hyproj.tmLanguage.json"
+			}
+		],
+		"snippets": [
+			{
+				"language": "hylang",
+				"path": "./snippets/hydrogen.json"
+			}
+		],
+		"configuration": {
+			"title": "Hylang Language Tools",
+			"properties": {
+				"hylang.hyPath": {
+					"type": "string",
+					"default": "hy",
+					"description": "Path to the Hylang hy executable. Use an absolute path if it is not on PATH."
+				},
+				"hylang.enableCompilerDiagnostics": {
+					"type": "boolean",
+					"default": true,
+					"description": "Run hy check after saving a .hy or .hyproj file."
+				},
+				"hylang.enableStructuralDiagnostics": {
+					"type": "boolean",
+					"default": true,
+					"description": "Check unmatched brackets, strings, and comments while editing."
+				},
+				"hylang.checkTarget": {
+					"type": "string",
+					"default": "",
+					"description": "Optional file or .hyproj target for hy check, relative to the workspace. Leave blank to check the current file."
+				},
+				"hylang.diagnostics.debounceMs": {
+					"type": "number",
+					"default": 300,
+					"minimum": 100,
+					"description": "Delay in milliseconds before updating structural diagnostics after typing."
+				}
+			}
+		},
+		"commands": [
+			{
+				"command": "hylang.checkCurrentFile",
+				"title": "Hylang: Check Current File"
+			},
+			{
+				"command": "hylang.formatCurrentFile",
+				"title": "Hylang: Format Current File"
+			}
+		],
+		"menus": {
+			"editor/context": [
+				{	"command": "hylang.checkCurrentFile",
+					"when": "editorLangId == hylang || editorLangId == hyproj",
+					"group": "navigation"
+				}, {"command": "hylang.formatCurrentFile",
+					"when": "editorLangId == hylang || editorLangId == hyproj",
+					"group": "navigation"
+				}
+			]
+		}
+  	},
+	"devDependencies": {
+		"@types/vscode": "^1.85.0",
+		"@vscode/vsce": "^4.0.0",
+		"typescript": "^6.0.3"
+	}
 }
