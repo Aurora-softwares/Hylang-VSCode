@@ -1,6 +1,10 @@
+<div align="center">
+
+<img src="assets/hydrogen.icon.svg" width="30%" />
+
 # Hydrogen Language Tools for VS Code
 
-![Hydrogen extension icon](assets/hylang-icon.png)
+</div>
 
 Editor support for Hylang (also called Hydrogen). The extension recognizes `.hy` source files and `.hyproj` project manifests.
 
