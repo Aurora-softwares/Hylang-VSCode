@@ -3,6 +3,9 @@
 .vscode/**
 node_modules/**
 dist/**
+!dist/README.md
+!dist/CHANGELOG.md
+scripts/**
 test/**
 package-lock.json
 .gitignore
